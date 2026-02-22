@@ -4,7 +4,6 @@
 # Rust / wasm-pack
 **/target/
 othello-ai-web/pkg/
-wasm/
 
 # Editor / IDE
 .vscode/

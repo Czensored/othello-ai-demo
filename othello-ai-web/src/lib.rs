@@ -26,7 +26,15 @@ pub fn best_move(board: &[u8], ai_color: u8, depth: u8) -> i32 {
         return -1;
     }
     let depth = depth.clamp(1, 10);
-    let (_, mv) = minimax(&b, ai_color, ai_color, depth, f64::NEG_INFINITY, f64::INFINITY, 0);
+    let (_, mv) = minimax(
+        &b,
+        ai_color,
+        ai_color,
+        depth,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        0,
+    );
     let chosen = mv.unwrap_or(moves[0]);
     (chosen.0 * 8 + chosen.1) as i32
 }
@@ -56,7 +64,11 @@ pub fn best_move_final(board: &[u8], ai_color: u8, depth: u8) -> i32 {
 }
 
 fn other(player: u8) -> u8 {
-    if player == BLACK { WHITE } else { BLACK }
+    if player == BLACK {
+        WHITE
+    } else {
+        BLACK
+    }
 }
 
 fn on_board(row: i32, col: i32) -> bool {
@@ -67,7 +79,14 @@ fn idx(row: usize, col: usize) -> usize {
     row * 8 + col
 }
 
-fn captures_in_direction(board: &[u8; 64], row: usize, col: usize, player: u8, dy: i32, dx: i32) -> bool {
+fn captures_in_direction(
+    board: &[u8; 64],
+    row: usize,
+    col: usize,
+    player: u8,
+    dy: i32,
+    dx: i32,
+) -> bool {
     let opp = other(player);
     let mut r = row as i32 + dy;
     let mut c = col as i32 + dx;
@@ -317,7 +336,15 @@ fn minimax(
 
     let moves = get_moves(board, player);
     if moves.is_empty() {
-        return minimax(board, other(player), ai, depth - 1, alpha, beta, pass_count + 1);
+        return minimax(
+            board,
+            other(player),
+            ai,
+            depth - 1,
+            alpha,
+            beta,
+            pass_count + 1,
+        );
     }
 
     if player == ai {
