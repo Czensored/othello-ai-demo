@@ -1,5 +1,3 @@
-import initWasm, { best_move, best_move_final } from "./wasm/othello_ai_web.js";
-
 const EMPTY = 0;
 const WHITE = 1;
 const BLACK = 2;
@@ -31,6 +29,8 @@ let ai = WHITE;
 let gameOver = false;
 let aiThinking = false;
 let wasmReady = false;
+let bestMoveFn = null;
+let bestMoveFinalFn = null;
 let moveHistory = [];
 let aiTimerId = null;
 
@@ -275,14 +275,14 @@ function runAiTurn() {
     }
 
     let move = moves[0];
-    if (wasmReady) {
+    if (wasmReady && bestMoveFn && bestMoveFinalFn) {
       const depth = getSearchDepth();
       const { black, white } = countPieces(board);
       const currentScore = black + white;
       const useFinalSearch = currentScore + 6 + depth >= 64;
       const encoded = useFinalSearch
-        ? best_move_final(flattenBoard(board), ai, 64 - currentScore)
-        : best_move(flattenBoard(board), ai, depth);
+        ? bestMoveFinalFn(flattenBoard(board), ai, 64 - currentScore)
+        : bestMoveFn(flattenBoard(board), ai, depth);
       if (encoded >= 0) {
         const row = Math.floor(encoded / 8);
         const col = encoded % 8;
@@ -379,7 +379,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 try {
-  await initWasm();
+  const wasmMod = await import("./wasm/othello_ai_web.js");
+  bestMoveFn = wasmMod.best_move;
+  bestMoveFinalFn = wasmMod.best_move_final;
+  await wasmMod.default();
   wasmReady = true;
 } catch (err) {
   console.error("Failed to initialize Rust/Wasm AI:", err);
