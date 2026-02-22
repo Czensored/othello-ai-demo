@@ -1,0 +1,148 @@
+:root {
+  --bg: #0b0f17;
+  --panel: rgba(255, 255, 255, 0.06);
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.68);
+  --border: rgba(255, 255, 255, 0.14);
+  --board: #1e6f3c;
+  --board-dark: #175a31;
+  --hint: rgba(255, 255, 255, 0.38);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 22px 16px 40px;
+}
+
+.top h1 {
+  margin: 8px 0 10px;
+}
+
+.top p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.back {
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.panel {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  align-items: center;
+}
+
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+select,
+button {
+  font: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 8px 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.scorebar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 12px;
+}
+
+.game-wrap {
+  padding: 12px;
+}
+
+.board {
+  width: min(88vw, 620px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--board);
+}
+
+.cell {
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  background: var(--board);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cell:nth-child(16n + 1),
+.cell:nth-child(16n + 3),
+.cell:nth-child(16n + 5),
+.cell:nth-child(16n + 7),
+.cell:nth-child(16n + 10),
+.cell:nth-child(16n + 12),
+.cell:nth-child(16n + 14),
+.cell:nth-child(16n + 16) {
+  background: var(--board-dark);
+}
+
+.cell:disabled {
+  cursor: default;
+}
+
+.piece {
+  width: 76%;
+  height: 76%;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.25);
+}
+
+.piece.black {
+  background: #101216;
+}
+
+.piece.white {
+  background: #f2f2f2;
+}
+
+.hint {
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: var(--hint);
+}

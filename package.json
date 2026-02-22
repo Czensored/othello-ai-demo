@@ -1,0 +1,8 @@
+{
+  "name": "othello-ai-demo",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build:wasm": "cd othello-ai-web && wasm-pack build --mode no-install --target web --out-dir ../wasm"
+  }
+}

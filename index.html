@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Othello AI Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <h1>Othello AI Demo</h1>
+        <p>Play against a minimax + alpha-beta AI in your browser.</p>
+      </header>
+
+      <section class="panel controls" aria-label="Game controls">
+        <label>
+          You play:
+          <select id="side">
+            <option value="2">Black (First)</option>
+            <option value="1">White (Second)</option>
+          </select>
+        </label>
+        <label>
+          AI depth:
+          <select id="depth">
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8" selected>8</option>
+          </select>
+        </label>
+        <button id="new-game" type="button">New Game</button>
+        <button id="undo" type="button" title="Hotkey: U">Undo Turn (U)</button>
+      </section>
+
+      <section class="panel scorebar" aria-label="Scoreboard">
+        <div><strong>Black</strong>: <span id="black-score">2</span></div>
+        <div><strong>White</strong>: <span id="white-score">2</span></div>
+        <div><strong>Turn</strong>: <span id="turn-label">Black</span></div>
+      </section>
+
+      <section class="panel game-wrap">
+        <div id="board" class="board" aria-label="Othello board"></div>
+      </section>
+    </main>
+
+    <script type="module" src="./script.js"></script>
+  </body>
+</html>
