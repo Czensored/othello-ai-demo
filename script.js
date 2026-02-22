@@ -16,7 +16,6 @@ const boardEl = document.getElementById("board");
 const blackScoreEl = document.getElementById("black-score");
 const whiteScoreEl = document.getElementById("white-score");
 const turnLabelEl = document.getElementById("turn-label");
-const statusEl = document.getElementById("status");
 const newGameBtn = document.getElementById("new-game");
 const undoBtn = document.getElementById("undo");
 const sideSelect = document.getElementById("side");
@@ -31,6 +30,7 @@ let aiThinking = false;
 let wasmReady = false;
 let bestMoveFn = null;
 let bestMoveFinalFn = null;
+let wasmInitError = "";
 let moveHistory = [];
 let aiTimerId = null;
 
@@ -144,9 +144,25 @@ function flattenBoard(b) {
 }
 
 function setStatus(text) {
-  if (statusEl) {
-    statusEl.textContent = text;
+  void text;
+}
+
+function formatErrorMessage(err) {
+  if (!err) return "Unknown initialization error.";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.stack || err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
   }
+}
+
+function wasmUnavailableStatus() {
+  if (wasmInitError) {
+    return `AI stopped: Wasm failed to initialize. ${wasmInitError}`;
+  }
+  return "AI stopped: Wasm is not initialized.";
 }
 
 function cloneBoard(b) {
@@ -258,12 +274,26 @@ function afterMove() {
 
 function runAiTurn() {
   if (gameOver) return;
+  if (!wasmReady || !bestMoveFn || !bestMoveFinalFn) {
+    aiThinking = false;
+    setStatus(wasmUnavailableStatus());
+    refreshBoard();
+    return;
+  }
+
   aiThinking = true;
   refreshBoard();
-  setStatus(wasmReady ? "AI thinking..." : "AI unavailable.");
+  setStatus("AI thinking...");
 
   aiTimerId = window.setTimeout(() => {
     aiTimerId = null;
+    if (!wasmReady || !bestMoveFn || !bestMoveFinalFn) {
+      aiThinking = false;
+      setStatus(wasmUnavailableStatus());
+      refreshBoard();
+      return;
+    }
+
     const moves = getMoves(board, ai);
     if (moves.length === 0) {
       aiThinking = false;
@@ -274,23 +304,30 @@ function runAiTurn() {
       return;
     }
 
-    let move = moves[0];
-    if (wasmReady && bestMoveFn && bestMoveFinalFn) {
-      const depth = getSearchDepth();
-      const { black, white } = countPieces(board);
-      const currentScore = black + white;
-      const useFinalSearch = currentScore + 6 + depth >= 64;
-      const encoded = useFinalSearch
-        ? bestMoveFinalFn(flattenBoard(board), ai, 64 - currentScore)
-        : bestMoveFn(flattenBoard(board), ai, depth);
-      if (encoded >= 0) {
-        const row = Math.floor(encoded / 8);
-        const col = encoded % 8;
-        if (moves.some(([r, c]) => r === row && c === col)) {
-          move = [row, col];
-        }
-      }
+    const depth = getSearchDepth();
+    const { black, white } = countPieces(board);
+    const currentScore = black + white;
+    const useFinalSearch = currentScore + 6 + depth >= 64;
+    const encoded = useFinalSearch
+      ? bestMoveFinalFn(flattenBoard(board), ai, 64 - currentScore)
+      : bestMoveFn(flattenBoard(board), ai, depth);
+
+    if (encoded < 0) {
+      aiThinking = false;
+      setStatus(`AI stopped: Wasm returned no move (encoded=${encoded}).`);
+      refreshBoard();
+      return;
     }
+
+    const row = Math.floor(encoded / 8);
+    const col = encoded % 8;
+    if (!moves.some(([r, c]) => r === row && c === col)) {
+      aiThinking = false;
+      setStatus(`AI stopped: Wasm returned illegal move ${row},${col}.`);
+      refreshBoard();
+      return;
+    }
+    const move = [row, col];
 
     saveSnapshot();
     board = applyMove(board, move[0], move[1], ai);
@@ -384,9 +421,11 @@ try {
   bestMoveFinalFn = wasmMod.best_move_final;
   await wasmMod.default();
   wasmReady = true;
+  wasmInitError = "";
 } catch (err) {
   console.error("Failed to initialize Rust/Wasm AI:", err);
   wasmReady = false;
+  wasmInitError = formatErrorMessage(err);
 }
 
 startGame();

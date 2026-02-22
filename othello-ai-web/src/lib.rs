@@ -1,172 +1,101 @@
 use wasm_bindgen::prelude::*;
 
-const EMPTY: u8 = 0;
-const WHITE: u8 = 1;
-const BLACK: u8 = 2;
-const DIRS: [(i32, i32); 8] = [
-    (-1, -1),
-    (-1, 0),
-    (-1, 1),
-    (0, -1),
-    (0, 1),
-    (1, -1),
-    (1, 0),
-    (1, 1),
-];
+const WHITE: i32 = 1;
+const BLACK: i32 = 2;
 
-#[wasm_bindgen]
-pub fn best_move(board: &[u8], ai_color: u8, depth: u8) -> i32 {
-    if board.len() != 64 || (ai_color != BLACK && ai_color != WHITE) {
-        return -1;
-    }
-    let mut b = [0_u8; 64];
-    b.copy_from_slice(board);
-    let moves = get_moves(&b, ai_color);
-    if moves.is_empty() {
-        return -1;
-    }
-    let depth = depth.clamp(1, 10);
-    let (_, mv) = minimax(
-        &b,
-        ai_color,
-        ai_color,
-        depth,
-        f64::NEG_INFINITY,
-        f64::INFINITY,
-        0,
-    );
-    let chosen = mv.unwrap_or(moves[0]);
-    (chosen.0 * 8 + chosen.1) as i32
-}
-
-#[wasm_bindgen]
-pub fn best_move_final(board: &[u8], ai_color: u8, depth: u8) -> i32 {
-    if board.len() != 64 || (ai_color != BLACK && ai_color != WHITE) {
-        return -1;
-    }
-    let mut b = [0_u8; 64];
-    b.copy_from_slice(board);
-    let moves = get_moves(&b, ai_color);
-    if moves.is_empty() {
-        return -1;
-    }
-    let depth = depth.max(1);
-    let (_, mv) = minimax_final(
-        &b,
-        ai_color,
-        ai_color,
-        depth,
-        f64::NEG_INFINITY,
-        f64::INFINITY,
-    );
-    let chosen = mv.unwrap_or(moves[0]);
-    (chosen.0 * 8 + chosen.1) as i32
-}
-
-fn other(player: u8) -> u8 {
-    if player == BLACK {
-        WHITE
-    } else {
-        BLACK
-    }
-}
-
-fn on_board(row: i32, col: i32) -> bool {
-    (0..8).contains(&row) && (0..8).contains(&col)
-}
-
-fn idx(row: usize, col: usize) -> usize {
-    row * 8 + col
-}
-
-fn captures_in_direction(
-    board: &[u8; 64],
+fn check_directions(
+    board: &[[i32; 8]; 8],
     row: usize,
     col: usize,
-    player: u8,
+    player: i32,
     dy: i32,
     dx: i32,
 ) -> bool {
-    let opp = other(player);
     let mut r = row as i32 + dy;
     let mut c = col as i32 + dx;
-    let mut seen_opp = false;
 
-    while on_board(r, c) {
-        let v = board[idx(r as usize, c as usize)];
-        if v == opp {
-            seen_opp = true;
-            r += dy;
-            c += dx;
-            continue;
-        }
-        if v == player {
-            return seen_opp;
-        }
+    // First step must be opponent.
+    if r < 0 || r >= 8 || c < 0 || c >= 8 {
         return false;
     }
-    false
-}
 
-fn valid_move(board: &[u8; 64], row: usize, col: usize, player: u8) -> bool {
-    if board[idx(row, col)] != EMPTY {
+    let mut piece = board[r as usize][c as usize];
+    if piece == 0 || piece == player {
         return false;
     }
-    for (dy, dx) in DIRS {
-        if captures_in_direction(board, row, col, player, dy, dx) {
+
+    // Move further in the same direction.
+    for _ in 0..6 {
+        r += dy;
+        c += dx;
+
+        if r < 0 || r >= 8 || c < 0 || c >= 8 {
+            return false;
+        }
+
+        piece = board[r as usize][c as usize];
+        if piece == 0 {
+            return false;
+        }
+        if piece == player {
             return true;
         }
     }
+
     false
 }
 
-fn get_moves(board: &[u8; 64], player: u8) -> Vec<(usize, usize)> {
-    let mut out = Vec::with_capacity(32);
+fn valid_move(board: &[[i32; 8]; 8], row: usize, col: usize, player: i32) -> bool {
+    if row >= 8 || col >= 8 || board[row][col] != 0 {
+        return false;
+    }
+
+    const DIRS: [(i32, i32); 8] = [
+        (-1, -1),
+        (-1, 0),
+        (-1, 1),
+        (0, -1),
+        (0, 1),
+        (1, -1),
+        (1, 0),
+        (1, 1),
+    ];
+
+    for &(dy, dx) in DIRS.iter() {
+        if check_directions(board, row, col, player, dy, dx) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn all_moves(board: &[[i32; 8]; 8], player: i32) -> Vec<(usize, usize)> {
+    let mut moves = Vec::with_capacity(60);
+
     for row in 0..8 {
         for col in 0..8 {
             if valid_move(board, row, col, player) {
-                out.push((row, col));
+                moves.push((row, col));
             }
         }
     }
-    out
+
+    moves
 }
 
-fn apply_move(board: &[u8; 64], row: usize, col: usize, player: u8) -> [u8; 64] {
-    let mut next = *board;
-    next[idx(row, col)] = player;
-    let opp = other(player);
+fn evaluate_board(board: &[[i32; 8]; 8], computer: i32) -> f64 {
+    let opp = 3 - computer;
 
-    for (dy, dx) in DIRS {
-        if !captures_in_direction(&next, row, col, player, dy, dx) {
-            continue;
-        }
+    let mut my_tiles = 0;
+    let mut opp_tiles = 0;
+    let mut my_front_tiles = 0;
+    let mut opp_front_tiles = 0;
 
-        let mut r = row as i32 + dy;
-        let mut c = col as i32 + dx;
-        while on_board(r, c) && next[idx(r as usize, c as usize)] == opp {
-            next[idx(r as usize, c as usize)] = player;
-            r += dy;
-            c += dx;
-        }
-    }
-
-    next
-}
-
-fn terminal(board: &[u8; 64]) -> bool {
-    get_moves(board, BLACK).is_empty() && get_moves(board, WHITE).is_empty()
-}
-
-fn evaluate(board: &[u8; 64], ai: u8) -> f64 {
-    let opp = other(ai);
-    let mut my_tiles = 0_i32;
-    let mut opp_tiles = 0_i32;
-    let mut my_front_tiles = 0_i32;
-    let mut opp_front_tiles = 0_i32;
     let x1: [i32; 8] = [-1, -1, 0, 1, 1, 1, 0, -1];
     let y1: [i32; 8] = [0, 1, 1, 1, 0, -1, -1, -1];
-    let board_values: [[i32; 8]; 8] = [
+
+    let board_values = [
         [20, -3, 11, 8, 8, 11, -3, 20],
         [-3, -7, -4, 1, 1, -4, -7, -3],
         [11, -4, 2, 2, 2, 2, -4, 11],
@@ -176,25 +105,24 @@ fn evaluate(board: &[u8; 64], ai: u8) -> f64 {
         [-3, -7, -4, 1, 1, -4, -7, -3],
         [20, -3, 11, 8, 8, 11, -3, 20],
     ];
-    let mut d = 0_i32;
 
+    let mut d = 0;
     for row in 0..8 {
         for col in 0..8 {
-            let v = board[idx(row, col)];
-            if v == ai {
+            if board[row][col] == computer {
                 d += board_values[row][col];
                 my_tiles += 1;
-            } else if v == opp {
+            } else if board[row][col] == opp {
                 d -= board_values[row][col];
                 opp_tiles += 1;
             }
 
-            if v != EMPTY {
+            if board[row][col] != 0 {
                 for k in 0..8 {
                     let y = row as i32 + y1[k];
                     let x = col as i32 + x1[k];
-                    if on_board(y, x) && board[idx(y as usize, x as usize)] == EMPTY {
-                        if v == ai {
+                    if y >= 0 && y < 8 && x >= 0 && x < 8 && board[y as usize][x as usize] == 0 {
+                        if board[row][col] == computer {
                             my_front_tiles += 1;
                         } else {
                             opp_front_tiles += 1;
@@ -231,13 +159,28 @@ fn evaluate(board: &[u8; 64], ai: u8) -> f64 {
     my_tiles = 0;
     opp_tiles = 0;
 
-    for (r, c) in [(0, 0), (0, 7), (7, 0), (7, 7)] {
-        let v = board[idx(r, c)];
-        if v == ai {
-            my_tiles += 1;
-        } else if v == opp {
-            opp_tiles += 1;
-        }
+    if board[0][0] == computer {
+        my_tiles += 1;
+    } else if board[0][0] == opp {
+        opp_tiles += 1;
+    }
+
+    if board[0][7] == computer {
+        my_tiles += 1;
+    } else if board[0][7] == opp {
+        opp_tiles += 1;
+    }
+
+    if board[7][0] == computer {
+        my_tiles += 1;
+    } else if board[7][0] == opp {
+        opp_tiles += 1;
+    }
+
+    if board[7][7] == computer {
+        my_tiles += 1;
+    } else if board[7][7] == opp {
+        opp_tiles += 1;
     }
 
     let c = 25.0 * (my_tiles as f64 - opp_tiles as f64);
@@ -245,51 +188,82 @@ fn evaluate(board: &[u8; 64], ai: u8) -> f64 {
     my_tiles = 0;
     opp_tiles = 0;
 
-    if board[idx(0, 0)] == EMPTY {
-        for (r, c2) in [(0, 1), (1, 1), (1, 0)] {
-            let v = board[idx(r, c2)];
-            if v == ai {
-                my_tiles += 1;
-            } else if v == opp {
-                opp_tiles += 1;
-            }
+    if board[0][0] == 0 {
+        if board[0][1] == computer {
+            my_tiles += 1;
+        } else if board[0][1] == opp {
+            opp_tiles += 1;
+        }
+        if board[1][1] == computer {
+            my_tiles += 1;
+        } else if board[1][1] == opp {
+            opp_tiles += 1;
+        }
+        if board[1][0] == computer {
+            my_tiles += 1;
+        } else if board[1][0] == opp {
+            opp_tiles += 1;
         }
     }
-    if board[idx(0, 7)] == EMPTY {
-        for (r, c2) in [(0, 6), (1, 6), (1, 7)] {
-            let v = board[idx(r, c2)];
-            if v == ai {
-                my_tiles += 1;
-            } else if v == opp {
-                opp_tiles += 1;
-            }
+
+    if board[0][7] == 0 {
+        if board[0][6] == computer {
+            my_tiles += 1;
+        } else if board[0][6] == opp {
+            opp_tiles += 1;
+        }
+        if board[1][6] == computer {
+            my_tiles += 1;
+        } else if board[1][6] == opp {
+            opp_tiles += 1;
+        }
+        if board[1][7] == computer {
+            my_tiles += 1;
+        } else if board[1][7] == opp {
+            opp_tiles += 1;
         }
     }
-    if board[idx(7, 0)] == EMPTY {
-        for (r, c2) in [(7, 1), (6, 1), (6, 0)] {
-            let v = board[idx(r, c2)];
-            if v == ai {
-                my_tiles += 1;
-            } else if v == opp {
-                opp_tiles += 1;
-            }
+
+    if board[7][0] == 0 {
+        if board[7][1] == computer {
+            my_tiles += 1;
+        } else if board[7][1] == opp {
+            opp_tiles += 1;
+        }
+        if board[6][1] == computer {
+            my_tiles += 1;
+        } else if board[6][1] == opp {
+            opp_tiles += 1;
+        }
+        if board[6][0] == computer {
+            my_tiles += 1;
+        } else if board[6][0] == opp {
+            opp_tiles += 1;
         }
     }
-    if board[idx(7, 7)] == EMPTY {
-        for (r, c2) in [(6, 7), (6, 6), (7, 6)] {
-            let v = board[idx(r, c2)];
-            if v == ai {
-                my_tiles += 1;
-            } else if v == opp {
-                opp_tiles += 1;
-            }
+
+    if board[7][7] == 0 {
+        if board[6][7] == computer {
+            my_tiles += 1;
+        } else if board[6][7] == opp {
+            opp_tiles += 1;
+        }
+        if board[6][6] == computer {
+            my_tiles += 1;
+        } else if board[6][6] == opp {
+            opp_tiles += 1;
+        }
+        if board[7][6] == computer {
+            my_tiles += 1;
+        } else if board[7][6] == opp {
+            opp_tiles += 1;
         }
     }
 
     let l = -12.5 * (my_tiles as f64 - opp_tiles as f64);
 
-    my_tiles = get_moves(board, ai).len() as i32;
-    opp_tiles = get_moves(board, opp).len() as i32;
+    my_tiles = all_moves(board, computer).len() as i32;
+    opp_tiles = all_moves(board, opp).len() as i32;
 
     let m = if my_tiles > opp_tiles {
         (100.0 * my_tiles as f64) / (my_tiles + opp_tiles) as f64
@@ -302,116 +276,75 @@ fn evaluate(board: &[u8; 64], ai: u8) -> f64 {
     (10.0 * p) + (801.724 * c) + (382.026 * l) + (78.922 * m) + (74.396 * f) + (10.0 * d as f64)
 }
 
-fn evaluate_final(board: &[u8; 64], ai: u8) -> f64 {
-    let opp = other(ai);
-    let mut my_tiles = 0_i32;
-    let mut opp_tiles = 0_i32;
+fn apply_move(board: &[[i32; 8]; 8], row: usize, col: usize, player: i32) -> [[i32; 8]; 8] {
+    let mut new_board = *board;
+    new_board[row][col] = player;
 
-    for row in 0..8 {
-        for col in 0..8 {
-            let v = board[idx(row, col)];
-            if v == ai {
-                my_tiles += 1;
-            } else if v == opp {
-                opp_tiles += 1;
+    for (y, x) in [
+        (-1, -1),
+        (-1, 0),
+        (-1, 1),
+        (0, -1),
+        (0, 1),
+        (1, -1),
+        (1, 0),
+        (1, 1),
+    ]
+    .iter()
+    {
+        if check_directions(board, row, col, player, *y, *x) {
+            let mut new_y = *y;
+            let mut new_x = *x;
+
+            let mut next_row = (row as i32 + new_y) as usize;
+            let mut next_col = (col as i32 + new_x) as usize;
+
+            while new_board[next_row][next_col] != player {
+                new_board[next_row][next_col] = player;
+
+                new_y += y;
+                new_x += x;
+
+                next_row = (row as i32 + new_y) as usize;
+                next_col = (col as i32 + new_x) as usize;
             }
         }
     }
 
-    (my_tiles - opp_tiles) as f64
+    new_board
 }
 
-fn minimax(
-    board: &[u8; 64],
-    player: u8,
-    ai: u8,
-    depth: u8,
-    mut alpha: f64,
-    mut beta: f64,
-    pass_count: u8,
+fn rust_alpha_beta_helper(
+    board: &[[i32; 8]; 8],
+    depth: i32,
+    alpha: f64,
+    beta: f64,
+    player: i32,
+    computer: i32,
 ) -> (f64, Option<(usize, usize)>) {
-    if depth == 0 || pass_count >= 2 || terminal(board) {
-        return (evaluate(board, ai), None);
-    }
-
-    let moves = get_moves(board, player);
-    if moves.is_empty() {
-        return minimax(
-            board,
-            other(player),
-            ai,
-            depth - 1,
-            alpha,
-            beta,
-            pass_count + 1,
-        );
-    }
-
-    if player == ai {
-        let mut best_score = f64::NEG_INFINITY;
-        let mut best_move = None;
-        for mv in moves {
-            let next = apply_move(board, mv.0, mv.1, player);
-            let (score, _) = minimax(&next, other(player), ai, depth - 1, alpha, beta, 0);
-            if score > best_score {
-                best_score = score;
-                best_move = Some(mv);
-            }
-            alpha = alpha.max(best_score);
-            if beta <= alpha {
-                break;
-            }
-        }
-        (best_score, best_move)
-    } else {
-        let mut best_score = f64::INFINITY;
-        let mut best_move = None;
-        for mv in moves {
-            let next = apply_move(board, mv.0, mv.1, player);
-            let (score, _) = minimax(&next, other(player), ai, depth - 1, alpha, beta, 0);
-            if score < best_score {
-                best_score = score;
-                best_move = Some(mv);
-            }
-            beta = beta.min(best_score);
-            if beta <= alpha {
-                break;
-            }
-        }
-        (best_score, best_move)
-    }
-}
-
-fn minimax_final(
-    board: &[u8; 64],
-    player: u8,
-    ai: u8,
-    depth: u8,
-    mut alpha: f64,
-    mut beta: f64,
-) -> (f64, Option<(usize, usize)>) {
-    let moves = get_moves(board, player);
+    let moves = all_moves(board, player);
     let player_has_no_moves = moves.is_empty();
 
-    if depth == 0 || (player_has_no_moves && get_moves(board, other(player)).is_empty()) {
-        return (evaluate_final(board, ai), None);
+    if depth == 0 || (player_has_no_moves && all_moves(board, 3 - player).is_empty()) {
+        return (evaluate_board(board, computer), None);
     }
-
-    // Match the original implementation: passing does not consume depth.
     if player_has_no_moves {
-        return minimax_final(board, other(player), ai, depth, alpha, beta);
+        return rust_alpha_beta_helper(board, depth, alpha, beta, 3 - player, computer);
     }
 
+    let mut alpha = alpha;
+    let mut beta = beta;
     let mut best_move = None;
 
-    for mv in moves {
-        let next = apply_move(board, mv.0, mv.1, player);
-        let (value, _) = minimax_final(&next, other(player), ai, depth - 1, alpha, beta);
+    for (row, col) in moves {
+        let new_board = apply_move(board, row, col, player);
+        let (value, _) =
+            rust_alpha_beta_helper(&new_board, depth - 1, alpha, beta, 3 - player, computer);
 
-        if player == ai {
+        if player == computer {
             if value > alpha {
                 alpha = value;
-                best_move = Some(mv);
+                best_move = Some((row, col));
             }
             if alpha >= beta {
                 break;
@@ -419,7 +352,7 @@ fn minimax_final(
         } else {
             if value < beta {
                 beta = value;
-                best_move = Some(mv);
+                best_move = Some((row, col));
             }
             if beta <= alpha {
                 break;
@@ -427,9 +360,143 @@ fn minimax_final(
         }
     }
 
-    if player == ai {
-        (alpha, best_move)
-    } else {
-        (beta, best_move)
+    (if player == computer { alpha } else { beta }, best_move)
+}
+
+fn evaluate_board_final_moves(board: &[[i32; 8]; 8], computer: i32) -> f64 {
+    let opp = 3 - computer;
+
+    let mut my_tiles = 0;
+    let mut opp_tiles = 0;
+
+    for row in 0..8 {
+        for col in 0..8 {
+            if board[row][col] == computer {
+                my_tiles += 1;
+            } else if board[row][col] == opp {
+                opp_tiles += 1;
+            }
+        }
+    }
+    my_tiles as f64 - opp_tiles as f64
+}
+
+fn rust_alpha_beta_final_moves_helper(
+    board: &[[i32; 8]; 8],
+    depth: i32,
+    alpha: f64,
+    beta: f64,
+    player: i32,
+    computer: i32,
+) -> (f64, Option<(usize, usize)>) {
+    let moves = all_moves(board, player);
+    let player_has_no_moves = moves.is_empty();
+
+    if depth == 0 || (player_has_no_moves && all_moves(board, 3 - player).is_empty()) {
+        return (evaluate_board_final_moves(board, computer), None);
+    }
+
+    if player_has_no_moves {
+        return rust_alpha_beta_final_moves_helper(board, depth, alpha, beta, 3 - player, computer);
+    }
+
+    let mut alpha = alpha;
+    let mut beta = beta;
+    let mut best_move = None;
+
+    for (row, col) in moves {
+        let new_board = apply_move(board, row, col, player);
+        let (value, _) = rust_alpha_beta_final_moves_helper(
+            &new_board,
+            depth - 1,
+            alpha,
+            beta,
+            3 - player,
+            computer,
+        );
+
+        if player == computer {
+            if value > alpha {
+                alpha = value;
+                best_move = Some((row, col));
+            }
+            if alpha >= beta {
+                break;
+            }
+        } else {
+            if value < beta {
+                beta = value;
+                best_move = Some((row, col));
+            }
+            if beta <= alpha {
+                break;
+            }
+        }
+    }
+
+    (if player == computer { alpha } else { beta }, best_move)
+}
+
+fn board_from_flat(board: &[u8]) -> Option<[[i32; 8]; 8]> {
+    if board.len() != 64 {
+        return None;
+    }
+
+    let mut board_array = [[0_i32; 8]; 8];
+    for row in 0..8 {
+        for col in 0..8 {
+            board_array[row][col] = board[row * 8 + col] as i32;
+        }
+    }
+    Some(board_array)
+}
+
+#[wasm_bindgen]
+pub fn best_move(board: &[u8], ai_color: u8, depth: u8) -> i32 {
+    if ai_color != WHITE as u8 && ai_color != BLACK as u8 {
+        return -1;
+    }
+
+    let Some(board_array) = board_from_flat(board) else {
+        return -1;
+    };
+
+    let (_, mv) = rust_alpha_beta_helper(
+        &board_array,
+        depth as i32,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        ai_color as i32,
+        ai_color as i32,
+    );
+
+    match mv {
+        Some((row, col)) => (row * 8 + col) as i32,
+        None => -1,
+    }
+}
+
+#[wasm_bindgen]
+pub fn best_move_final(board: &[u8], ai_color: u8, depth: u8) -> i32 {
+    if ai_color != WHITE as u8 && ai_color != BLACK as u8 {
+        return -1;
+    }
+
+    let Some(board_array) = board_from_flat(board) else {
+        return -1;
+    };
+
+    let (_, mv) = rust_alpha_beta_final_moves_helper(
+        &board_array,
+        depth as i32,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        ai_color as i32,
+        ai_color as i32,
+    );
+
+    match mv {
+        Some((row, col)) => (row * 8 + col) as i32,
+        None => -1,
     }
 }

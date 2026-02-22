@@ -1,0 +1,15 @@
+{
+  "name": "othello-ai-web",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "othello_ai_web_bg.wasm",
+    "othello_ai_web.js",
+    "othello_ai_web.d.ts"
+  ],
+  "main": "othello_ai_web.js",
+  "types": "othello_ai_web.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

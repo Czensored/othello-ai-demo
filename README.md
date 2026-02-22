@@ -9,14 +9,6 @@ Interactive Othello/Reversi web demo using Rust + WebAssembly for AI logic and J
 - Endgame search switch for faster late-game response
 - Depth controls, side selection, and undo
 
-## Project Structure
-
-- `index.html` – standalone app entry
-- `styles.css` – UI styling
-- `script.js` – game loop + UI + Rust/Wasm integration
-- `wasm/` – generated Wasm artifacts used by the browser
-- `othello-ai-web/` – Rust source crate for AI logic
-
 ## Run Locally
 
 ### 1) Rebuild Wasm (after Rust changes)
