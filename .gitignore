@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Rust / wasm-pack
+**/target/
+othello-ai-web/pkg/
+wasm/
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
