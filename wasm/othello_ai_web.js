@@ -4,26 +4,30 @@
  * @param {Uint8Array} board
  * @param {number} ai_color
  * @param {number} depth
- * @returns {number}
+ * @returns {Float64Array}
  */
-export function best_move(board, ai_color, depth) {
+export function best_move_final_with_confidence(board, ai_color, depth) {
     const ptr0 = passArray8ToWasm0(board, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.best_move(ptr0, len0, ai_color, depth);
-    return ret;
+    const ret = wasm.best_move_final_with_confidence(ptr0, len0, ai_color, depth);
+    var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v2;
 }
 
 /**
  * @param {Uint8Array} board
  * @param {number} ai_color
  * @param {number} depth
- * @returns {number}
+ * @returns {Float64Array}
  */
-export function best_move_final(board, ai_color, depth) {
+export function best_move_with_confidence(board, ai_color, depth) {
     const ptr0 = passArray8ToWasm0(board, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.best_move_final(ptr0, len0, ai_color, depth);
-    return ret;
+    const ret = wasm.best_move_with_confidence(ptr0, len0, ai_color, depth);
+    var v2 = getArrayF64FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 8, 8);
+    return v2;
 }
 
 function __wbg_get_imports() {
@@ -43,6 +47,19 @@ function __wbg_get_imports() {
         __proto__: null,
         "./othello_ai_web_bg.js": import0,
     };
+}
+
+function getArrayF64FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat64ArrayMemory0().subarray(ptr / 8, ptr / 8 + len);
+}
+
+let cachedFloat64ArrayMemory0 = null;
+function getFloat64ArrayMemory0() {
+    if (cachedFloat64ArrayMemory0 === null || cachedFloat64ArrayMemory0.byteLength === 0) {
+        cachedFloat64ArrayMemory0 = new Float64Array(wasm.memory.buffer);
+    }
+    return cachedFloat64ArrayMemory0;
 }
 
 let cachedUint8ArrayMemory0 = null;
@@ -66,6 +83,7 @@ let wasmModule, wasm;
 function __wbg_finalize_init(instance, module) {
     wasm = instance.exports;
     wasmModule = module;
+    cachedFloat64ArrayMemory0 = null;
     cachedUint8ArrayMemory0 = null;
     wasm.__wbindgen_start();
     return wasm;

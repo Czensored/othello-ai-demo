@@ -451,17 +451,17 @@ fn board_from_flat(board: &[u8]) -> Option<[[i32; 8]; 8]> {
     Some(board_array)
 }
 
-#[wasm_bindgen]
-pub fn best_move(board: &[u8], ai_color: u8, depth: u8) -> i32 {
+fn compute_best_move_and_score(
+    board: &[u8],
+    ai_color: u8,
+    depth: u8,
+) -> Option<(i32, f64)> {
     if ai_color != WHITE as u8 && ai_color != BLACK as u8 {
-        return -1;
+        return None;
     }
 
-    let Some(board_array) = board_from_flat(board) else {
-        return -1;
-    };
-
-    let (_, mv) = rust_alpha_beta_helper(
+    let board_array = board_from_flat(board)?;
+    let (score, mv) = rust_alpha_beta_helper(
         &board_array,
         depth as i32,
         f64::NEG_INFINITY,
@@ -470,33 +470,45 @@ pub fn best_move(board: &[u8], ai_color: u8, depth: u8) -> i32 {
         ai_color as i32,
     );
 
-    match mv {
-        Some((row, col)) => (row * 8 + col) as i32,
-        None => -1,
+    let (row, col) = mv?;
+    Some(((row * 8 + col) as i32, score))
+}
+
+fn compute_best_move_and_score_final(
+    board: &[u8],
+    ai_color: u8,
+    depth: u8,
+) -> Option<(i32, f64)> {
+    if ai_color != WHITE as u8 && ai_color != BLACK as u8 {
+        return None;
     }
+
+    let board_array = board_from_flat(board)?;
+    let (score, mv) = rust_alpha_beta_final_moves_helper(
+        &board_array,
+        depth as i32,
+        f64::NEG_INFINITY,
+        f64::INFINITY,
+        ai_color as i32,
+        ai_color as i32,
+    );
+
+    let (row, col) = mv?;
+    Some(((row * 8 + col) as i32, score))
 }
 
 #[wasm_bindgen]
-pub fn best_move_final(board: &[u8], ai_color: u8, depth: u8) -> i32 {
-    if ai_color != WHITE as u8 && ai_color != BLACK as u8 {
-        return -1;
-    }
+pub fn best_move_with_confidence(board: &[u8], ai_color: u8, depth: u8) -> Box<[f64]> {
+    let (encoded, score) = compute_best_move_and_score(board, ai_color, depth)
+        .map(|(encoded, score)| (encoded as f64, score))
+        .unwrap_or((-1.0, f64::NAN));
+    vec![encoded, score].into_boxed_slice()
+}
 
-    let Some(board_array) = board_from_flat(board) else {
-        return -1;
-    };
-
-    let (_, mv) = rust_alpha_beta_final_moves_helper(
-        &board_array,
-        depth as i32,
-        f64::NEG_INFINITY,
-        f64::INFINITY,
-        ai_color as i32,
-        ai_color as i32,
-    );
-
-    match mv {
-        Some((row, col)) => (row * 8 + col) as i32,
-        None => -1,
-    }
+#[wasm_bindgen]
+pub fn best_move_final_with_confidence(board: &[u8], ai_color: u8, depth: u8) -> Box<[f64]> {
+    let (encoded, score) = compute_best_move_and_score_final(board, ai_color, depth)
+        .map(|(encoded, score)| (encoded as f64, score))
+        .unwrap_or((-1.0, f64::NAN));
+    vec![encoded, score].into_boxed_slice()
 }

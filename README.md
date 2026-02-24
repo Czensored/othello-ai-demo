@@ -4,9 +4,11 @@ Demo: <https://othello.isaacsalzman.com/>
 
 Interactive Othello/Reversi web demo using Rust + WebAssembly for AI logic and JavaScript/HTML/CSS for UI.
 
+![Othello Ai demo](./docs/othello-ai-demo.png)
+
 - Minimax + alpha-beta pruning
 - Weighted board evaluation
-- Endgame search switch for faster late-game response
+- Endgame search switch for stronger late-game response
 - Depth controls, side selection, and undo
 
 ## Run Locally

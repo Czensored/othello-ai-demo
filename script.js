@@ -28,8 +28,8 @@ let ai = WHITE;
 let gameOver = false;
 let aiThinking = false;
 let wasmReady = false;
-let bestMoveFn = null;
-let bestMoveFinalFn = null;
+let bestMoveWithConfidenceFn = null;
+let bestMoveFinalWithConfidenceFn = null;
 let wasmInitError = "";
 let moveHistory = [];
 let aiTimerId = null;
@@ -169,11 +169,12 @@ function cloneBoard(b) {
   return b.map((row) => row.slice());
 }
 
-function saveSnapshot() {
+function saveSnapshot(beforeHumanMove = false) {
   moveHistory.push({
     board: cloneBoard(board),
     currentPlayer,
     gameOver,
+    beforeHumanMove,
   });
 }
 
@@ -184,9 +185,13 @@ function restoreSnapshot(snapshot) {
   aiThinking = false;
 }
 
+function hasUndoTarget() {
+  return moveHistory.some((snapshot) => snapshot.beforeHumanMove);
+}
+
 function updateUndoButton() {
   if (undoBtn) {
-    undoBtn.disabled = moveHistory.length < 2 || aiThinking;
+    undoBtn.disabled = !hasUndoTarget() || aiThinking;
   }
 }
 
@@ -274,7 +279,11 @@ function afterMove() {
 
 function runAiTurn() {
   if (gameOver) return;
-  if (!wasmReady || !bestMoveFn || !bestMoveFinalFn) {
+  if (
+    !wasmReady ||
+    !bestMoveWithConfidenceFn ||
+    !bestMoveFinalWithConfidenceFn
+  ) {
     aiThinking = false;
     setStatus(wasmUnavailableStatus());
     refreshBoard();
@@ -287,7 +296,11 @@ function runAiTurn() {
 
   aiTimerId = window.setTimeout(() => {
     aiTimerId = null;
-    if (!wasmReady || !bestMoveFn || !bestMoveFinalFn) {
+    if (
+      !wasmReady ||
+      !bestMoveWithConfidenceFn ||
+      !bestMoveFinalWithConfidenceFn
+    ) {
       aiThinking = false;
       setStatus(wasmUnavailableStatus());
       refreshBoard();
@@ -308,9 +321,11 @@ function runAiTurn() {
     const { black, white } = countPieces(board);
     const currentScore = black + white;
     const useFinalSearch = currentScore + 6 + depth >= 64;
-    const encoded = useFinalSearch
-      ? bestMoveFinalFn(flattenBoard(board), ai, 64 - currentScore)
-      : bestMoveFn(flattenBoard(board), ai, depth);
+    const flatBoard = flattenBoard(board);
+    const [encodedRaw, confidence] = useFinalSearch
+      ? bestMoveFinalWithConfidenceFn(flatBoard, ai, 64 - currentScore)
+      : bestMoveWithConfidenceFn(flatBoard, ai, depth);
+    const encoded = Number(encodedRaw);
 
     if (encoded < 0) {
       aiThinking = false;
@@ -329,8 +344,13 @@ function runAiTurn() {
     }
     const move = [row, col];
 
-    saveSnapshot();
+    saveSnapshot(false);
     board = applyMove(board, move[0], move[1], ai);
+    if (Number.isFinite(confidence)) {
+      console.log(`Confidence: ${confidence}`);
+    } else {
+      console.log("Confidence: infinite");
+    }
     aiThinking = false;
     setStatus(`AI played ${String.fromCharCode(65 + move[1])}${move[0] + 1}.`);
     afterMove();
@@ -365,7 +385,7 @@ boardEl.addEventListener("click", (event) => {
   const col = Number(cell.dataset.col);
   if (!validMove(board, row, col, human)) return;
 
-  saveSnapshot();
+  saveSnapshot(true);
   board = applyMove(board, row, col, human);
   afterMove();
 });
@@ -377,17 +397,21 @@ function undoLastTurn() {
     window.clearTimeout(aiTimerId);
     aiTimerId = null;
   }
-  if (moveHistory.length < 2) return;
+  if (!hasUndoTarget()) return;
 
-  const steps = 2;
   let snapshot = null;
-  for (let i = 0; i < steps; i += 1) {
-    snapshot = moveHistory.pop();
+  // Rewind to the latest state captured immediately before a human move.
+  while (moveHistory.length > 0) {
+    const candidate = moveHistory.pop();
+    if (candidate && candidate.beforeHumanMove) {
+      snapshot = candidate;
+      break;
+    }
   }
   if (!snapshot) return;
 
   restoreSnapshot(snapshot);
-  setStatus("Undid last turn.");
+  setStatus("Undid to previous user move.");
   refreshBoard();
 
   if (!gameOver && currentPlayer === ai) {
@@ -417,8 +441,8 @@ window.addEventListener("keydown", (event) => {
 
 try {
   const wasmMod = await import("./wasm/othello_ai_web.js");
-  bestMoveFn = wasmMod.best_move;
-  bestMoveFinalFn = wasmMod.best_move_final;
+  bestMoveWithConfidenceFn = wasmMod.best_move_with_confidence;
+  bestMoveFinalWithConfidenceFn = wasmMod.best_move_final_with_confidence;
   await wasmMod.default();
   wasmReady = true;
   wasmInitError = "";

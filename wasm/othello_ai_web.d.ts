@@ -1,18 +1,19 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export function best_move(board: Uint8Array, ai_color: number, depth: number): number;
+export function best_move_final_with_confidence(board: Uint8Array, ai_color: number, depth: number): Float64Array;
 
-export function best_move_final(board: Uint8Array, ai_color: number, depth: number): number;
+export function best_move_with_confidence(board: Uint8Array, ai_color: number, depth: number): Float64Array;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly best_move: (a: number, b: number, c: number, d: number) => number;
-    readonly best_move_final: (a: number, b: number, c: number, d: number) => number;
+    readonly best_move_with_confidence: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly best_move_final_with_confidence: (a: number, b: number, c: number, d: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
+    readonly __wbindgen_free: (a: number, b: number, c: number) => void;
     readonly __wbindgen_start: () => void;
 }
 
